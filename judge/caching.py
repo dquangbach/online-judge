@@ -23,11 +23,11 @@ def arg_to_str(arg):
     if hasattr(arg, "id"):
         return str(arg.id)
     if isinstance(arg, list) or isinstance(arg, QuerySet):
-        return xxhash.xxh64_hexdigest(str(list(arg)))[:MAX_NUM_CHAR]
+        return xxhash.xxh64_hexdigest(str(list(arg)).encode("utf-8"))[:MAX_NUM_CHAR]
 
     arg_str = str(arg)
     if len(arg_str) > MAX_NUM_CHAR:
-        hash_suffix = xxhash.xxh64_hexdigest(arg_str)[: MAX_NUM_CHAR - 4]
+        hash_suffix = xxhash.xxh64_hexdigest(arg_str.encode("utf-8"))[: MAX_NUM_CHAR - 4]
         return f"{arg_str[:4]}{hash_suffix}"
     return arg_str
 
