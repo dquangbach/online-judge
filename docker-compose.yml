@@ -1,0 +1,83 @@
+name: dutoj
+
+services:
+  db:
+    image: mariadb:10.11
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: dmoj
+      MYSQL_USER: dmoj
+      MYSQL_PASSWORD: dmoj
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./.docker/dev-local/mariadb-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  memcached:
+    image: memcached:1.6-alpine
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: .docker/dev-local/Dockerfile
+    restart: unless-stopped
+    working_dir: /code
+    volumes:
+      - .:/code
+      - ./.docker/dev-local/local_settings_docker.py:/code/dmoj/local_settings.py
+      - media_data:/media
+      - static_data:/static
+      - problem_data:/problems
+    ports:
+      - "8000:8001"
+      - "8001:8001"
+    depends_on:
+      db:
+        condition: service_healthy
+      memcached:
+        condition: service_started
+      redis:
+        condition: service_started
+
+  bridge:
+    build:
+      context: .
+      dockerfile: .docker/bridge/Dockerfile
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - .:/app
+      - ./.docker/dev-local/local_settings_docker.py:/app/dmoj/local_settings.py
+    depends_on:
+      db:
+        condition: service_healthy
+
+  judge:
+    image: ${JUDGE_IMAGE:-vnoj/judge-tier1:latest}
+    restart: unless-stopped
+    cap_add:
+      - SYS_PTRACE
+    volumes:
+      - problem_data:/problems
+    command: ["run", "-c", "/problems/__conf__/general.yml", "--no-watchdog", "bridge", "judge1"]
+    depends_on:
+      - bridge
+    profiles:
+      - judge
+
+volumes:
+  db_data:
+  media_data:
+  static_data:
+  problem_data:

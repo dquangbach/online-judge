@@ -26,6 +26,7 @@ WORKDIR /code
 
 # Python deps — cached layer, only rebuilds when requirements.txt changes
 COPY requirements.txt .
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
 RUN pip3 install --no-cache-dir -r requirements.txt mysqlclient
 
 # Path is relative to build context (online-judge/)

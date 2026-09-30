@@ -42,3 +42,9 @@ plan/
 .playwright-mcp/
 playwright.config.ts
 tmp/
+.venv
+venv
+static_collected/
+media_uploads/
+problem_data/
+.agents/

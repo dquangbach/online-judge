@@ -1,0 +1,14 @@
+.venv
+venv
+.git
+.idea
+.vscode
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+node_modules
+static_collected
+media_uploads
+problem_data
+.DS_Store

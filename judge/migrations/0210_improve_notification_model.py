@@ -141,7 +141,7 @@ class Migration(migrations.Migration):
             field=models.CharField(
                 max_length=16000,  # Temporary larger size
                 verbose_name="category",
-                db_index=True,
+                db_index=False,
             ),
         ),
         # Run the data migration to convert categories

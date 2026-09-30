@@ -14,8 +14,7 @@ class Migration(migrations.Migration):
                         "ALTER TABLE judge_submissiontestcase "
                         "DROP COLUMN extended_feedback, "
                         "DROP COLUMN feedback, "
-                        "DROP COLUMN output, "
-                        "ALGORITHM=INSTANT, LOCK=NONE"
+                        "DROP COLUMN output"
                     ),
                     # Result details were backfilled to result.json before this
                     # deploy; rolling back past this migration is a deploy

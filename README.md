@@ -1,16 +1,13 @@
-LQDOJ: Le Quy Don Online Judge
-===
+# DUT Online Judge (DUTOJ)
 
-[![](https://github.com/DMOJ/online-judge/workflows/build/badge.svg)](https://lqdoj.edu.vn/)
-[![Python](https://img.shields.io/pypi/pyversions/tensorflow.svg?style=plastic)](https://python.org)
-[![OS](https://img.shields.io/badge/Ubuntu-16.04%20%7C%2018.04%20%7C%2020.04-brightgreen)](https://ubuntu.com/download)
-[![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](https://www.gnu.org/licenses/agpl-3.0.en.html)
+Hệ thống chấm bài và thi lập trình trực tuyến phục vụ sinh viên môn Kỹ thuật Lập trình (KTLT) - Trường Đại học Bách khoa, Đại học Đà Nẵng.
 
-# Overview
+> **Tham khảo & Ghi nhận nguồn gốc:**  
+> Dự án này được phát triển, tùy biến nhận diện thương hiệu và hoàn thiện môi trường Docker dựa trên repo gốc: [LQDJudge/online-judge](https://github.com/LQDJudge/online-judge) (kế thừa từ nền tảng [DMOJ](https://dmoj.ca/)).
 
-Homepage: [https://lqdoj.edu.vn](https://lqdoj.edu.vn)
+---
 
-Based on [DMOJ](https://dmoj.ca/).
+# Tổng quan (Overview)
 
 **Supported Programming Languages:**
 

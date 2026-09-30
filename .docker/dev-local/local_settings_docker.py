@@ -42,9 +42,9 @@ STATIC_ROOT = "/static"
 MEDIA_ROOT = "/media"
 DMOJ_PROBLEM_DATA_ROOT = "/problems"
 
-# ── Site identity ────────────────────────────────────────────────────────────
-SITE_NAME = "LQDOJ"
-SITE_LONG_NAME = "Le Quy Don Online Judge"
+SITE_NAME = "DUTOJ"
+SITE_LONG_NAME = "DUT Online Judge"
+DMOJ_REQUIRE_STAFF_2FA = False
 
 # ── Chat (required) ──────────────────────────────────────────────────────────
 CHAT_SECRET_KEY = "ey7AAB1E6_14AMGUNY6yIKM05wWx9dTE9N0naq4Hr58="
