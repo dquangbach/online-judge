@@ -64,17 +64,16 @@ services:
         condition: service_healthy
 
   judge:
-    image: ${JUDGE_IMAGE:-vnoj/judge-tier1:latest}
+    image: dutoj-judge:latest
     restart: unless-stopped
     cap_add:
       - SYS_PTRACE
     volumes:
       - problem_data:/problems
-    command: ["run", "-c", "/problems/__conf__/general.yml", "--no-watchdog", "bridge", "judge1"]
+      - ./.docker/judge/judge.yml:/home/judge/judge.yml:ro
+    command: ["-c", "/home/judge/judge.yml", "--no-watchdog", "-p", "9999", "bridge", "judge1", "judge_secret_key_123"]
     depends_on:
       - bridge
-    profiles:
-      - judge
 
 volumes:
   db_data:
