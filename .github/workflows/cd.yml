@@ -1,0 +1,123 @@
+name: CD Production Deployment
+
+on:
+  # Kích hoạt khi gắn tag phát hành (ví dụ: v1.0.0, v1.1.2)
+  push:
+    tags:
+      - 'v*'
+  # Hoặc cho phép kích hoạt thủ công từ giao diện GitHub Actions với ref cụ thể
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: 'Git branch, commit SHA hoặc tag cần triển khai'
+        required: true
+        default: 'master'
+
+# Cơ chế chống đụng độ: Ngăn hai lần triển khai chạy đồng thời và không ngắt ngang tiến trình đang chạy
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Production (103.161.96.114)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate Compose Config before SSH
+        run: |
+          docker compose -f docker-compose.prod.yml --env-file .env.production.example config > /dev/null
+          echo "Compose configuration syntax verified."
+
+      - name: Execute Deterministic Deployment via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_SSH_PORT || 22 }}
+          script_stop: true
+          envs: TARGET_REF
+          script: |
+            set -euo pipefail
+            DEPLOY_DIR="${DEPLOY_PATH:-/opt/online-judge}"
+            TARGET="${TARGET_REF:-${{ github.ref_name }}}"
+            
+            echo "=========================================================="
+            echo " BẮT ĐẦU QUY TRÌNH TRIỂN KHAI PRODUCTION"
+            echo " Thư mục: $DEPLOY_DIR | Target: $TARGET"
+            echo "=========================================================="
+
+            if [ ! -d "$DEPLOY_DIR" ]; then
+              echo "LỖI: Thư mục $DEPLOY_DIR không tồn tại trên server!"
+              exit 1
+            fi
+
+            cd "$DEPLOY_DIR"
+
+            # 1. Kiểm tra file cấu hình môi trường
+            if [ ! -f ".env.production" ]; then
+              echo "LỖI: Không tìm thấy file .env.production trên máy chủ!"
+              exit 1
+            fi
+
+            # 2. Lưu lại commit hiện tại để sẵn sàng rollback nếu lỗi
+            PREV_COMMIT=$(git rev-parse HEAD || echo "none")
+            echo "Commit hiện tại trước khi deploy: $PREV_COMMIT"
+
+            # 3. Kéo mã nguồn theo đúng Tag / Commit SHA cụ thể (không dùng git pull unpinned)
+            echo "==> Đang fetch và checkout phiên bản $TARGET..."
+            git fetch --tags origin
+            git checkout "$TARGET"
+            DEPLOYED_COMMIT=$(git rev-parse HEAD)
+            echo "Đã chuyển sang commit: $DEPLOYED_COMMIT"
+
+            # 4. Build lại các container có thay đổi
+            echo "==> Đang build các dịch vụ container..."
+            docker compose -f docker-compose.prod.yml build web bridge wsevent celery_worker celery_beat
+
+            # 5. Chạy database migrations một cách an toàn
+            echo "==> Đang thực hiện migrate database..."
+            docker compose -f docker-compose.prod.yml run --rm web python3 manage.py migrate --noinput
+
+            # 6. Thu thập file tĩnh static files
+            echo "==> Đang gom static files..."
+            docker compose -f docker-compose.prod.yml run --rm web python3 manage.py collectstatic --noinput
+
+            # 7. Khởi động lại dịch vụ theo cơ chế rolling update
+            echo "==> Đang cập nhật và khởi chạy các container..."
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # 8. Post-deploy Smoke Test & Health Check
+            echo "==> Đang kiểm tra sức khỏe ứng dụng sau khi deploy..."
+            SUCCESS=0
+            for i in {1..12}; do
+              # Kiểm tra cổng nội bộ 8001
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8001/ || echo "000")
+              if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
+                echo "Xác nhận thành công: Web phản hồi mã HTTP $HTTP_CODE ở lượt thử thứ $i."
+                SUCCESS=1
+                break
+              fi
+              echo "Chờ phản hồi từ web container... ($i/12, mã: $HTTP_CODE)"
+              sleep 5
+            done
+
+            if [ "$SUCCESS" -ne 1 ]; then
+              echo "=========================================================="
+              echo "CẢNH BÁO: Smoke test thất bại! Bắt đầu quy trình ROLLBACK..."
+              echo "=========================================================="
+              if [ "$PREV_COMMIT" != "none" ]; then
+                git checkout "$PREV_COMMIT"
+                docker compose -f docker-compose.prod.yml build web bridge wsevent celery_worker celery_beat
+                docker compose -f docker-compose.prod.yml up -d --remove-orphans
+                echo "Đã rollback về commit $PREV_COMMIT thành công."
+              fi
+              exit 1
+            fi
+
+            echo "=========================================================="
+            echo " TRIỂN KHAI PRODUCTION HOÀN TẤT THÀNH CÔNG!"
+            echo "=========================================================="

@@ -48,3 +48,9 @@ static_collected/
 media_uploads/
 problem_data/
 .agents/
+
+# Environment and secrets
+.env
+.env.*
+!.env.production.example
+!.env.example

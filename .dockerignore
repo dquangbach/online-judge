@@ -12,3 +12,5 @@ static_collected
 media_uploads
 problem_data
 .DS_Store
+.env*
+!.env.production.example

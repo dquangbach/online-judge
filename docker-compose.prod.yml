@@ -1,0 +1,208 @@
+name: dutoj-prod
+
+services:
+  # ── Cơ sở dữ liệu MariaDB ───────────────────────────────────────────────────
+  db:
+    image: mariadb:10.11
+    restart: always
+    env_file:
+      - path: ${ENV_FILE:-.env.production}
+        required: false
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-dmoj}
+      MYSQL_USER: ${MYSQL_USER:-dmoj}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    command: [
+      "mysqld",
+      "--character-set-server=utf8mb4",
+      "--collation-server=utf8mb4_unicode_ci",
+      "--transaction-isolation=READ-COMMITTED",
+      "--max-connections=300"
+    ]
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - oj_internal
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Bộ nhớ đệm phân tán Redis ────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - oj_internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Bộ nhớ đệm L1 Memcached ─────────────────────────────────────────────────
+  memcached:
+    image: memcached:1.6-alpine
+    restart: always
+    command: ["-m", "256"]
+    networks:
+      - oj_internal
+
+  # ── WebSocket Realtime Event Daemon ─────────────────────────────────────────
+  wsevent:
+    build:
+      context: .
+      dockerfile: .docker/websocket/Dockerfile
+    restart: always
+    env_file:
+      - path: ${ENV_FILE:-.env.production}
+        required: false
+    environment:
+      HTTP_HOST: "0.0.0.0"
+      HTTP_PORT: 15100
+      EVENT_DAEMON_KEY: ${EVENT_DAEMON_KEY}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://127.0.0.1:8000,http://localhost:8000}
+    ports:
+      - "127.0.0.1:15100:15100"
+    networks:
+      - oj_internal
+    depends_on:
+      - redis
+
+  # ── Ứng dụng Web Django (uWSGI) ──────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: .docker/production/Dockerfile
+    restart: always
+    env_file:
+      - path: ${ENV_FILE:-.env.production}
+        required: false
+    command: ["uwsgi", "--ini", "/code/uwsgi.ini"]
+    volumes:
+      - static_data:/static
+      - media_data:/media
+      - problem_data:/problems
+    ports:
+      # Chỉ bind vào loopback 127.0.0.1 của host để Nginx reverse proxy
+      - "127.0.0.1:8001:8001"
+    networks:
+      - oj_internal
+      - oj_bridge_net
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      memcached:
+        condition: service_started
+      wsevent:
+        condition: service_started
+
+  # ── Bridge Điều phối Máy chấm ───────────────────────────────────────────────
+  bridge:
+    build:
+      context: .
+      dockerfile: .docker/production/Dockerfile
+    restart: always
+    env_file:
+      - path: ${ENV_FILE:-.env.production}
+        required: false
+    command: ["python3", "manage.py", "runbridged"]
+    volumes:
+      - problem_data:/problems
+    networks:
+      - oj_internal
+      - oj_bridge_net
+      - oj_judge_net
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Celery Background Worker ────────────────────────────────────────────────
+  celery_worker:
+    build:
+      context: .
+      dockerfile: .docker/production/Dockerfile
+    restart: always
+    env_file:
+      - path: ${ENV_FILE:-.env.production}
+        required: false
+    command: ["celery", "-A", "dmoj_celery", "worker", "--concurrency=4", "-l", "info"]
+    volumes:
+      - media_data:/media
+      - problem_data:/problems
+    networks:
+      - oj_internal
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Celery Periodic Scheduler (Beat) ─────────────────────────────────────────
+  celery_beat:
+    build:
+      context: .
+      dockerfile: .docker/production/Dockerfile
+    restart: always
+    env_file:
+      - path: ${ENV_FILE:-.env.production}
+        required: false
+    command: ["celery", "-A", "dmoj_celery", "beat", "-l", "info"]
+    networks:
+      - oj_internal
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Máy chấm Sandbox Execution (DMOJ Judge Server) ──────────────────────────
+  # LƯU Ý BẢO MẬT: Image judge-server được build từ LQDJudge/judge-server với cgroups v1/v2.
+  # Judge container được cách ly hoàn toàn trong mạng oj_judge_net, không kết nối DB/Redis.
+  judge:
+    image: ${JUDGE_IMAGE:-vnoj/judge-tier1:latest}
+    restart: always
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4096M
+    volumes:
+      - problem_data:/problems:ro
+      - ./.docker/judge/judge.yml:/home/judge/judge.yml:ro
+    command: ["run", "-c", "/home/judge/judge.yml", "--no-watchdog", "-p", "9999", "bridge", "${JUDGE_NAME:-judge1}"]
+    networks:
+      - oj_judge_net
+    depends_on:
+      - bridge
+
+networks:
+  oj_internal:
+    driver: bridge
+  oj_bridge_net:
+    driver: bridge
+  # Mạng biệt lập giữa Bridge và Judge: chặn truy cập ra ngoài internet hoặc DB
+  oj_judge_net:
+    driver: bridge
+    internal: true
+
+volumes:
+  db_data:
+  redis_data:
+  static_data:
+  media_data:
+  problem_data:
