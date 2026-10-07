@@ -8,14 +8,18 @@ def create_fulltext_indexes(apps, schema_editor):
         "WHERE table_schema = DATABASE() AND table_name = 'judge_problem' AND index_name = 'code_name_index'"
     )
     if cursor.fetchone()[0] == 0:
-        cursor.execute("CREATE FULLTEXT INDEX code_name_index ON judge_problem (code, name)")
+        cursor.execute(
+            "CREATE FULLTEXT INDEX code_name_index ON judge_problem (code, name)"
+        )
 
     cursor.execute(
         "SELECT COUNT(1) FROM information_schema.statistics "
         "WHERE table_schema = DATABASE() AND table_name = 'judge_contest' AND index_name = 'key_name_index'"
     )
     if cursor.fetchone()[0] == 0:
-        cursor.execute("CREATE FULLTEXT INDEX key_name_index ON judge_contest (`key`, name)")
+        cursor.execute(
+            "CREATE FULLTEXT INDEX key_name_index ON judge_contest (`key`, name)"
+        )
 
 
 class Migration(migrations.Migration):
@@ -25,6 +29,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(create_fulltext_indexes, reverse_code=migrations.RunPython.noop),
+        migrations.RunPython(
+            create_fulltext_indexes, reverse_code=migrations.RunPython.noop
+        ),
     ]
-

@@ -56,12 +56,8 @@ CELERY_RESULT_BACKEND_SECRET = os.environ.get(
 )
 
 # ── Static / Media / Problems ─────────────────────────────────────────────────
-STATIC_ROOT = os.environ.get(
-    "STATIC_ROOT", os.path.join(BASE_DIR, "static_collected")
-)
-MEDIA_ROOT = os.environ.get(
-    "MEDIA_ROOT", os.path.join(BASE_DIR, "media_uploads")
-)
+STATIC_ROOT = os.environ.get("STATIC_ROOT", os.path.join(BASE_DIR, "static_collected"))
+MEDIA_ROOT = os.environ.get("MEDIA_ROOT", os.path.join(BASE_DIR, "media_uploads"))
 DMOJ_PROBLEM_DATA_ROOT = os.environ.get(
     "DMOJ_PROBLEM_DATA_ROOT", os.path.join(BASE_DIR, "problem_data")
 )
@@ -77,9 +73,11 @@ except OSError:
 SITE_NAME = os.environ.get("SITE_NAME", "DUTOJ")
 SITE_LONG_NAME = os.environ.get("SITE_LONG_NAME", "DUT Online Judge")
 SITE_DOMAIN = os.environ.get("SITE_DOMAIN", "localhost")
-DMOJ_REQUIRE_STAFF_2FA = os.environ.get(
-    "DMOJ_REQUIRE_STAFF_2FA", "False"
-).lower() in ("true", "1", "yes")
+DMOJ_REQUIRE_STAFF_2FA = os.environ.get("DMOJ_REQUIRE_STAFF_2FA", "False").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 NODEJS = os.environ.get("NODEJS_PATH", "/usr/bin/node")
 
 # ── Chat & Event Daemons ──────────────────────────────────────────────────────

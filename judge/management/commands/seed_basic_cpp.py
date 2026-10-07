@@ -3,7 +3,14 @@ import zipfile
 import yaml
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from judge.models import Problem, ProblemGroup, ProblemType, ProblemData, ProblemTestCase, Language
+from judge.models import (
+    Problem,
+    ProblemGroup,
+    ProblemType,
+    ProblemData,
+    ProblemTestCase,
+    Language,
+)
 
 PROBLEMS = [
     {
@@ -418,6 +425,7 @@ Print $F(n) \\pmod{10^9 + 7}$.
     },
 ]
 
+
 class Command(BaseCommand):
     help = "Seed 10 basic C++ problems with complete English statements and real test cases"
 
@@ -466,11 +474,13 @@ class Command(BaseCommand):
                     out_name = f"{idx}.out"
                     zf.writestr(in_name, inp)
                     zf.writestr(out_name, out)
-                    test_cases_yaml.append({
-                        "in": in_name,
-                        "out": out_name,
-                        "points": 20,
-                    })
+                    test_cases_yaml.append(
+                        {
+                            "in": in_name,
+                            "out": out_name,
+                            "points": 20,
+                        }
+                    )
 
             init_yml = {
                 "archive": zip_name,
@@ -499,6 +509,10 @@ class Command(BaseCommand):
                     is_pretest=False,
                 )
 
-            self.stdout.write(self.style.SUCCESS(f"  ✓ [{code}] {name} ({len(pdata['tests'])} tests)"))
+            self.stdout.write(
+                self.style.SUCCESS(f"  ✓ [{code}] {name} ({len(pdata['tests'])} tests)")
+            )
 
-        self.stdout.write(self.style.SUCCESS("\nSuccessfully seeded 10 real C++ problems!"))
+        self.stdout.write(
+            self.style.SUCCESS("\nSuccessfully seeded 10 real C++ problems!")
+        )

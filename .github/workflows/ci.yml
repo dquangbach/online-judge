@@ -34,7 +34,8 @@ jobs:
         run: ruff check .
 
       - name: Run Black Code Formatter Check
-        run: black --check .
+        run: black --check --exclude '/(migrations|\.venv)/' .
+
 
   validate-compose:
     name: Docker Compose Validation
