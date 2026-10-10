@@ -30,8 +30,8 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
 # Copy application source code
 COPY . /code
 
-# Ensure production local_settings.py exists inside the container
-RUN cp -n .docker/production/local_settings_production.py /code/dmoj/local_settings.py || true
+# Install production settings explicitly; fail the build if they are missing.
+COPY .docker/production/local_settings_production.py /code/dmoj/local_settings.py
 
 # Precompile frontend assets in the image
 RUN sass resources:sass_processed --no-source-map --style=expanded --quiet && \

@@ -30,12 +30,23 @@ MYSQL_DATABASE=$(grep '^MYSQL_DATABASE=' "$ENV_FILE" | cut -d '=' -f2- | tr -d '
 MYSQL_USER=$(grep '^MYSQL_USER=' "$ENV_FILE" | cut -d '=' -f2- | tr -d '"'\''')
 MYSQL_PASSWORD=$(grep '^MYSQL_PASSWORD=' "$ENV_FILE" | cut -d '=' -f2- | tr -d '"'\''')
 
+MEDIA_DIR=$(sed -n 's/^MEDIA_DIR=//p' "$ENV_FILE" | head -n 1 | tr -d '"')
+PROBLEM_DIR=$(sed -n 's/^PROBLEM_DIR=//p' "$ENV_FILE" | head -n 1 | tr -d '"')
+if [ -z "$MYSQL_DATABASE" ] || [ -z "$MYSQL_USER" ] || [ -z "$MYSQL_PASSWORD" ] || \
+   [ -z "$MEDIA_DIR" ] || [ -z "$PROBLEM_DIR" ]; then
+    echo "LỖI: Thiếu biến database hoặc thư mục dữ liệu trong .env.production!"
+    exit 1
+fi
+if [ ! -d "$MEDIA_DIR" ] || [ ! -d "$PROBLEM_DIR" ]; then
+    echo "LỖI: MEDIA_DIR hoặc PROBLEM_DIR chưa tồn tại!"
+    exit 1
+fi
 mkdir -p "$CURRENT_BACKUP_DIR"
 
 # 2. Sao lưu Cơ sở dữ liệu MariaDB
 # LƯU Ý BẢO MẬT: Sử dụng biến MYSQL_PWD bên trong container để KHÔNG làm lộ mật khẩu ra 'ps aux'
 echo "==> Đang sao lưu Database MariaDB ($MYSQL_DATABASE)..."
-DB_CONTAINER=$(docker compose -f "$ROOT_DIR/docker-compose.prod.yml" ps -q db 2>/dev/null || echo "")
+DB_CONTAINER=$(docker compose -f "$ROOT_DIR/docker-compose.prod.yml" --env-file "$ENV_FILE" ps -q db 2>/dev/null || echo "")
 
 if [ -z "$DB_CONTAINER" ]; then
     echo "LỖI: Container database không đang chạy!"
@@ -63,9 +74,9 @@ echo "    Database dump thành công: $(du -h "$DB_DUMP_FILE" | cut -f1)"
 # 3. Sao lưu Dữ liệu Media (Upload của thí sinh / bài nộp)
 echo "==> Đang sao lưu thư mục Media uploads..."
 MEDIA_BACKUP_FILE="$CURRENT_BACKUP_DIR/media_${TIMESTAMP}.tar.gz"
-# Sao lưu từ volume docker media_data
+# Sao lưu thư mục bind mount đang được dùng bởi Nginx và các container.
 docker run --rm \
-    -v dutoj-prod_media_data:/source:ro \
+    -v "$MEDIA_DIR":/source:ro \
     -v "$CURRENT_BACKUP_DIR":/backup \
     alpine tar -czf "/backup/media_${TIMESTAMP}.tar.gz" -C /source .
 echo "    Media backup thành công: $(du -h "$MEDIA_BACKUP_FILE" | cut -f1)"
@@ -74,7 +85,7 @@ echo "    Media backup thành công: $(du -h "$MEDIA_BACKUP_FILE" | cut -f1)"
 echo "==> Đang sao lưu Problem data (Testcases)..."
 PROBLEMS_BACKUP_FILE="$CURRENT_BACKUP_DIR/problem_data_${TIMESTAMP}.tar.gz"
 docker run --rm \
-    -v dutoj-prod_problem_data:/source:ro \
+    -v "$PROBLEM_DIR":/source:ro \
     -v "$CURRENT_BACKUP_DIR":/backup \
     alpine tar -czf "/backup/problem_data_${TIMESTAMP}.tar.gz" -C /source .
 echo "    Problem data backup thành công: $(du -h "$PROBLEMS_BACKUP_FILE" | cut -f1)"

@@ -291,6 +291,7 @@ INSTALLED_APPS += (
 )
 
 MIDDLEWARE = (
+    "django.middleware.security.SecurityMiddleware",
     "judge.middleware.SlowRequestMiddleware",
     "judge.middleware.ShortCircuitMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",

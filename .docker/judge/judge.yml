@@ -1,5 +1,5 @@
-problem_storage_root:
-  - /problems
+problem_storage_globs:
+  - /problems/**/
 
 runtime:
   g++: /usr/bin/g++

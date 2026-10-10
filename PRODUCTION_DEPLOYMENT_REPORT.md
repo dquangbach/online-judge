@@ -1,4 +1,6 @@
 # BÁO CÁO TỔNG KẾT RÀ SOÁT, TỐI ƯU HÓA CẤU HÌNH PRODUCTION & PIPELINE CI/CD
+> **Lưu ý trạng thái:** Báo cáo này là tài liệu lịch sử và một số kết luận bên dưới không còn đúng với cấu hình repository hiện tại. Dùng [`DEPLOYMENT_READINESS_FIX_REPORT.md`](DEPLOYMENT_READINESS_FIX_REPORT.md) làm báo cáo trạng thái mới nhất; không xem các mục “✅ Đã sửa” trong tài liệu này là xác nhận deploy hiện tại.
+
 **Hệ thống:** DUTOJ / LQDOJ (Dựa trên DMOJ: Modern Online Judge)  
 **Repository:** `https://github.com/dquangbach/online-judge` (Nhánh: `master`)  
 **Máy chủ mục tiêu:** `103.161.96.114`  

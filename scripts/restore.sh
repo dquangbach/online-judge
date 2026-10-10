@@ -56,9 +56,18 @@ MYSQL_DATABASE=$(grep '^MYSQL_DATABASE=' "$ENV_FILE" | cut -d '=' -f2- | tr -d '
 MYSQL_USER=$(grep '^MYSQL_USER=' "$ENV_FILE" | cut -d '=' -f2- | tr -d '"'\''')
 MYSQL_PASSWORD=$(grep '^MYSQL_PASSWORD=' "$ENV_FILE" | cut -d '=' -f2- | tr -d '"'\''')
 
-DB_CONTAINER=$(docker compose -f "$ROOT_DIR/docker-compose.prod.yml" ps -q db 2>/dev/null || echo "")
+MEDIA_DIR=$(sed -n 's/^MEDIA_DIR=//p' "$ENV_FILE" | head -n 1 | tr -d '"')
+PROBLEM_DIR=$(sed -n 's/^PROBLEM_DIR=//p' "$ENV_FILE" | head -n 1 | tr -d '"')
+if [ -z "$MYSQL_DATABASE" ] || [ -z "$MYSQL_USER" ] || [ -z "$MYSQL_PASSWORD" ] || \
+   [ -z "$MEDIA_DIR" ] || [ -z "$PROBLEM_DIR" ]; then
+    echo "LỖI: Thiếu biến database hoặc thư mục dữ liệu trong .env.production!"
+    exit 1
+fi
+mkdir -p "$MEDIA_DIR" "$PROBLEM_DIR"
+
+DB_CONTAINER=$(docker compose -f "$ROOT_DIR/docker-compose.prod.yml" --env-file "$ENV_FILE" ps -q db 2>/dev/null || echo "")
 if [ -z "$DB_CONTAINER" ]; then
-    echo "LỖI: Container MariaDB không đang chạy! Vui lòng khởi động trước: docker compose -f docker-compose.prod.yml up -d db"
+    echo "LỖI: Container MariaDB không đang chạy! Vui lòng khởi động trước: docker compose -f docker-compose.prod.yml --env-file .env.production up -d db"
     exit 1
 fi
 
@@ -76,9 +85,9 @@ fi
 # 4. Khôi phục Media Files
 MEDIA_TAR=$(find "$TARGET_BACKUP_DIR" -name "media_*.tar.gz" | head -n 1)
 if [ -n "$MEDIA_TAR" ]; then
-    echo "==> Đang giải nén dữ liệu Media vào volume..."
+    echo "==> Đang giải nén dữ liệu Media vào thư mục bind mount..."
     docker run --rm \
-        -v dutoj-prod_media_data:/target \
+        -v "$MEDIA_DIR":/target \
         -v "$TARGET_BACKUP_DIR":/backup:ro \
         alpine sh -c "tar -xzf /backup/$(basename "$MEDIA_TAR") -C /target"
     echo "    Khôi phục media files hoàn tất."
@@ -87,9 +96,9 @@ fi
 # 5. Khôi phục Problem Data
 PROBLEMS_TAR=$(find "$TARGET_BACKUP_DIR" -name "problem_data_*.tar.gz" | head -n 1)
 if [ -n "$PROBLEMS_TAR" ]; then
-    echo "==> Đang giải nén dữ liệu Problem data vào volume..."
+    echo "==> Đang giải nén dữ liệu Problem data vào thư mục bind mount..."
     docker run --rm \
-        -v dutoj-prod_problem_data:/target \
+        -v "$PROBLEM_DIR":/target \
         -v "$TARGET_BACKUP_DIR":/backup:ro \
         alpine sh -c "tar -xzf /backup/$(basename "$PROBLEMS_TAR") -C /target"
     echo "    Khôi phục problem data hoàn tất."
@@ -97,5 +106,5 @@ fi
 
 echo "=========================================================="
 echo " KHÔI PHỤC HOÀN TẤT! Vui lòng chạy kiểm tra tính toàn vẹn:"
-echo " docker compose -f docker-compose.prod.yml restart web bridge"
+echo " docker compose -f docker-compose.prod.yml --env-file .env.production restart web bridge"
 echo "=========================================================="

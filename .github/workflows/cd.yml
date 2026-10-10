@@ -33,6 +33,8 @@ jobs:
 
       - name: Execute Deterministic Deployment via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          TARGET_REF: ${{ inputs.target_ref || github.ref_name }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
@@ -63,6 +65,18 @@ jobs:
               exit 1
             fi
 
+            # Validate the actual host config before changing the checked-out release.
+            if grep -Eq '^[A-Z_]+=change-me' .env.production; then
+              echo "LỖI: .env.production còn giá trị change-me; hãy thay tất cả secrets mẫu."
+              exit 1
+            fi
+            docker compose -f docker-compose.prod.yml --env-file .env.production config --quiet
+            SITE_DOMAIN=$(sed -n 's/^SITE_DOMAIN=//p' .env.production | head -n 1 | tr -d "\"'")
+            if [ -z "$SITE_DOMAIN" ] || [ "$SITE_DOMAIN" = "oj.yourdomain.com" ]; then
+              echo "LỖI: SITE_DOMAIN trong .env.production chưa được cấu hình."
+              exit 1
+            fi
+
             # 2. Lưu lại commit hiện tại để sẵn sàng rollback nếu lỗi
             PREV_COMMIT=$(git rev-parse HEAD || echo "none")
             echo "Commit hiện tại trước khi deploy: $PREV_COMMIT"
@@ -76,28 +90,42 @@ jobs:
 
             # 4. Build lại các container có thay đổi
             echo "==> Đang build các dịch vụ container..."
-            docker compose -f docker-compose.prod.yml build web bridge wsevent celery_worker celery_beat
+            docker compose -f docker-compose.prod.yml --env-file .env.production build web bridge wsevent celery_worker celery_beat
 
             # 5. Chạy database migrations một cách an toàn
             echo "==> Đang thực hiện migrate database..."
-            docker compose -f docker-compose.prod.yml run --rm web python3 manage.py migrate --noinput
+            docker compose -f docker-compose.prod.yml --env-file .env.production run --rm web python3 manage.py migrate --noinput
 
             # 6. Thu thập file tĩnh static files
             echo "==> Đang gom static files..."
-            docker compose -f docker-compose.prod.yml run --rm web python3 manage.py collectstatic --noinput
+            docker compose -f docker-compose.prod.yml --env-file .env.production run --rm web python3 manage.py collectstatic --noinput
 
             # 7. Khởi động lại dịch vụ theo cơ chế rolling update
             echo "==> Đang cập nhật và khởi chạy các container..."
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans
 
             # 8. Post-deploy Smoke Test & Health Check
             echo "==> Đang kiểm tra sức khỏe ứng dụng sau khi deploy..."
             SUCCESS=0
             for i in {1..12}; do
-              # Kiểm tra cổng nội bộ 8001
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8001/ || echo "000")
-              if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
-                echo "Xác nhận thành công: Web phản hồi mã HTTP $HTTP_CODE ở lượt thử thứ $i."
+              # Probe through host Nginx and TLS; port 8001 speaks the binary uWSGI protocol.
+              HTTP_CODE=$(curl --silent --show-error --output /dev/null --max-time 20 \
+                --resolve "${SITE_DOMAIN}:443:127.0.0.1" \
+                --write-out "%{http_code}" "https://${SITE_DOMAIN}/" 2>/dev/null || true)
+              STACK_RUNNING=1
+              for SERVICE in db redis wsevent web bridge celery_worker celery_beat judge; do
+                if [ -z "$(docker compose -f docker-compose.prod.yml --env-file .env.production ps --status running -q "$SERVICE")" ]; then
+                  echo "Dịch vụ $SERVICE chưa chạy."
+                  STACK_RUNNING=0
+                fi
+              done
+              BRIDGE_STATUS=$(docker compose -f docker-compose.prod.yml --env-file .env.production exec -T web python3 manage.py bridge_status --json 2>/dev/null || true)
+              if ! printf '%s' "$BRIDGE_STATUS" | grep -Eq '"judges":[1-9][0-9]*'; then
+                echo "Chưa có judge nào kết nối bridge."
+                STACK_RUNNING=0
+              fi
+              if [ "$STACK_RUNNING" -eq 1 ] && [[ "$HTTP_CODE" =~ ^[23][0-9][0-9]$ ]]; then
+                echo "Xác nhận thành công: HTTPS trả mã HTTP $HTTP_CODE ở lượt thử thứ $i."
                 SUCCESS=1
                 break
               fi
@@ -111,8 +139,8 @@ jobs:
               echo "=========================================================="
               if [ "$PREV_COMMIT" != "none" ]; then
                 git checkout "$PREV_COMMIT"
-                docker compose -f docker-compose.prod.yml build web bridge wsevent celery_worker celery_beat
-                docker compose -f docker-compose.prod.yml up -d --remove-orphans
+                docker compose -f docker-compose.prod.yml --env-file .env.production build web bridge wsevent celery_worker celery_beat
+                docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans
                 echo "Đã rollback về commit $PREV_COMMIT thành công."
               fi
               exit 1

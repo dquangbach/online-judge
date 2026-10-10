@@ -9,10 +9,10 @@ services:
       - path: ${ENV_FILE:-.env.production}
         required: false
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env.production}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-dmoj}
       MYSQL_USER: ${MYSQL_USER:-dmoj}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env.production}
     command: [
       "mysqld",
       "--character-set-server=utf8mb4",
@@ -66,8 +66,8 @@ services:
     environment:
       HTTP_HOST: "0.0.0.0"
       HTTP_PORT: 15100
-      EVENT_DAEMON_KEY: ${EVENT_DAEMON_KEY}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://127.0.0.1:8000,http://localhost:8000}
+      EVENT_DAEMON_KEY: ${EVENT_DAEMON_KEY:?Set EVENT_DAEMON_KEY in .env.production}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?Set ALLOWED_ORIGINS in .env.production}
     ports:
       - "127.0.0.1:15100:15100"
     networks:
@@ -86,9 +86,9 @@ services:
         required: false
     command: ["uwsgi", "--ini", "/code/uwsgi.ini"]
     volumes:
-      - static_data:/static
-      - media_data:/media
-      - problem_data:/problems
+      - ${STATIC_DIR:?Set STATIC_DIR in .env.production}:/static
+      - ${MEDIA_DIR:?Set MEDIA_DIR in .env.production}:/media
+      - ${PROBLEM_DIR:?Set PROBLEM_DIR in .env.production}:/problems
     ports:
       # Chỉ bind vào loopback 127.0.0.1 của host để Nginx reverse proxy
       - "127.0.0.1:8001:8001"
@@ -116,7 +116,7 @@ services:
         required: false
     command: ["python3", "manage.py", "runbridged"]
     volumes:
-      - problem_data:/problems
+      - ${PROBLEM_DIR:?Set PROBLEM_DIR in .env.production}:/problems
     networks:
       - oj_internal
       - oj_bridge_net
@@ -138,8 +138,8 @@ services:
         required: false
     command: ["celery", "-A", "dmoj_celery", "worker", "--concurrency=4", "-l", "info"]
     volumes:
-      - media_data:/media
-      - problem_data:/problems
+      - ${MEDIA_DIR:?Set MEDIA_DIR in .env.production}:/media
+      - ${PROBLEM_DIR:?Set PROBLEM_DIR in .env.production}:/problems
     networks:
       - oj_internal
     depends_on:
@@ -172,6 +172,12 @@ services:
   judge:
     image: ${JUDGE_IMAGE:-vnoj/judge-tier1:latest}
     restart: always
+    env_file:
+      - path: ${ENV_FILE:-.env.production}
+        required: false
+    environment:
+      JUDGE_AUTH_KEY: ${JUDGE_AUTH_KEY:?Set JUDGE_AUTH_KEY in .env.production}
+    entrypoint: ["python3", "/home/judge/entrypoint.py"]
     cap_add:
       - SYS_PTRACE
     security_opt:
@@ -182,9 +188,10 @@ services:
           cpus: "2.0"
           memory: 4096M
     volumes:
-      - problem_data:/problems:ro
+      - ${PROBLEM_DIR:?Set PROBLEM_DIR in .env.production}:/problems:ro
       - ./.docker/judge/judge.yml:/home/judge/judge.yml:ro
-    command: ["run", "-c", "/home/judge/judge.yml", "--no-watchdog", "-p", "9999", "bridge", "${JUDGE_NAME:-judge1}"]
+      - ./.docker/judge/entrypoint.py:/home/judge/entrypoint.py:ro
+    command: ["run", "-c", "/tmp/judge.yml", "--no-watchdog", "-p", "9999", "bridge", "${JUDGE_NAME:-judge1}"]
     networks:
       - oj_judge_net
     depends_on:
@@ -203,6 +210,3 @@ networks:
 volumes:
   db_data:
   redis_data:
-  static_data:
-  media_data:
-  problem_data:

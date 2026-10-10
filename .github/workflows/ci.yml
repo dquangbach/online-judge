@@ -48,3 +48,13 @@ jobs:
         run: |
           docker compose -f docker-compose.prod.yml --env-file .env.production.example config > /dev/null
           echo "docker-compose.prod.yml syntax and variable substitution are valid."
+
+  build-production-images:
+    name: Build Production Images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build web and event daemon images
+        run: docker compose -f docker-compose.prod.yml --env-file .env.production.example build web wsevent
