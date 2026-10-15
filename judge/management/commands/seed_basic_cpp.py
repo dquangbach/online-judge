@@ -1,8 +1,7 @@
-import os
+from io import BytesIO
 import zipfile
-import yaml
-from django.core.management.base import BaseCommand
-from django.conf import settings
+from django.core.files.base import ContentFile
+from django.core.management.base import BaseCommand, CommandError
 from judge.models import (
     Problem,
     ProblemGroup,
@@ -11,10 +10,11 @@ from judge.models import (
     ProblemTestCase,
     Language,
 )
+from judge.utils.problem_data import ProblemDataCompiler
 
 PROBLEMS = [
     {
-        "code": "cpp01_sum",
+        "code": "cpp01sum",
         "name": "Sum of Two Numbers",
         "type": "Mathematics",
         "group": "Beginner",
@@ -52,7 +52,7 @@ $12 + 34 = 46$.
         ],
     },
     {
-        "code": "cpp02_even_odd",
+        "code": "cpp02evenodd",
         "name": "Even or Odd Number",
         "type": "Implementation",
         "group": "Beginner",
@@ -95,7 +95,7 @@ EVEN
         ],
     },
     {
-        "code": "cpp03_factorial",
+        "code": "cpp03factorial",
         "name": "Factorial Calculation",
         "type": "Mathematics",
         "group": "Beginner",
@@ -135,7 +135,7 @@ $5! = 1 \\times 2 \\times 3 \\times 4 \\times 5 = 120$. Note that for $n = 20$, 
         ],
     },
     {
-        "code": "cpp04_max3",
+        "code": "cpp04max3",
         "name": "Maximum of Three Numbers",
         "type": "Implementation",
         "group": "Beginner",
@@ -170,7 +170,7 @@ Print the maximum value among $a$, $b$, and $c$.
         ],
     },
     {
-        "code": "cpp05_prime",
+        "code": "cpp05prime",
         "name": "Prime Number Check",
         "type": "Mathematics",
         "group": "Beginner",
@@ -214,7 +214,7 @@ NO
         ],
     },
     {
-        "code": "cpp06_reverse_array",
+        "code": "cpp06reversearray",
         "name": "Reverse an Array",
         "type": "Data Structures",
         "group": "Beginner",
@@ -251,7 +251,7 @@ Print the $n$ elements in reverse order, separated by a space.
         ],
     },
     {
-        "code": "cpp07_palindrome",
+        "code": "cpp07palindrome",
         "name": "Palindrome String",
         "type": "Strings",
         "group": "Beginner",
@@ -295,7 +295,7 @@ NO
         ],
     },
     {
-        "code": "cpp08_gcd_lcm",
+        "code": "cpp08gcdlcm",
         "name": "Greatest Common Divisor and LCM",
         "type": "Mathematics",
         "group": "Beginner",
@@ -330,7 +330,7 @@ Print $\\gcd(a, b)$ and $\\text{lcm}(a, b)$ on a single line, separated by a spa
         ],
     },
     {
-        "code": "cpp09_linear_search",
+        "code": "cpp09linearsearch",
         "name": "Linear Search in Array",
         "type": "Sorting",
         "group": "Beginner",
@@ -376,7 +376,7 @@ Print the 1-based index of the first occurrence of $x$, or `-1` if $x$ is not in
         ],
     },
     {
-        "code": "cpp10_fibonacci",
+        "code": "cpp10fibonacci",
         "name": "Fibonacci Number",
         "type": "Dynamic Prog.",
         "group": "Beginner",
@@ -430,74 +430,56 @@ class Command(BaseCommand):
     help = "Seed 10 basic C++ problems with complete English statements and real test cases"
 
     def handle(self, *args, **options):
-        data_root = getattr(settings, "DMOJ_PROBLEM_DATA_ROOT", "/problems")
-        os.makedirs(data_root, exist_ok=True)
         languages = list(Language.objects.all())
+        if not languages:
+            raise CommandError("No languages configured; add judge languages first.")
 
         self.stdout.write(self.style.NOTICE("Creating 10 basic C++ problems..."))
+        created_count = 0
 
         for pdata in PROBLEMS:
             code = pdata["code"]
             name = pdata["name"]
+            if Problem.objects.filter(code=code).exists():
+                self.stdout.write(f"  Skipping [{code}] (already exists)")
+                continue
+
             ptype, _ = ProblemType.objects.get_or_create(name=pdata["type"])
             group, _ = ProblemGroup.objects.get_or_create(name=pdata["group"])
 
-            problem, created = Problem.objects.update_or_create(
+            problem = Problem.objects.create(
                 code=code,
-                defaults={
-                    "name": name,
-                    "description": pdata["description"],
-                    "time_limit": pdata["time_limit"],
-                    "memory_limit": pdata["memory_limit"],
-                    "points": pdata["points"],
-                    "partial": True,
-                    "group": group,
-                    "is_public": True,
-                    "is_manually_managed": False,
-                },
+                name=name,
+                description=pdata["description"],
+                time_limit=pdata["time_limit"],
+                memory_limit=pdata["memory_limit"],
+                points=1,
+                partial=True,
+                group=group,
+                is_public=False,
+                is_manually_managed=False,
             )
             problem.types.add(ptype)
-            if languages:
-                problem.allowed_languages.set(languages)
-            problem.save()
+            problem.allowed_languages.set(languages)
 
-            # Create testcase files on disk
-            prob_dir = os.path.join(data_root, code)
-            os.makedirs(prob_dir, exist_ok=True)
+            # Save test data through the same storage and compiler as the admin UI.
             zip_name = f"{code}.zip"
-            zip_path = os.path.join(prob_dir, zip_name)
-            test_cases_yaml = []
-
-            with zipfile.ZipFile(zip_path, "w") as zf:
+            zip_bytes = BytesIO()
+            filenames = []
+            with zipfile.ZipFile(zip_bytes, "w", zipfile.ZIP_DEFLATED) as zf:
                 for idx, (inp, out) in enumerate(pdata["tests"], start=1):
                     in_name = f"{idx}.in"
                     out_name = f"{idx}.out"
                     zf.writestr(in_name, inp)
                     zf.writestr(out_name, out)
-                    test_cases_yaml.append(
-                        {
-                            "in": in_name,
-                            "out": out_name,
-                            "points": 20,
-                        }
-                    )
-
-            init_yml = {
-                "archive": zip_name,
-                "test_cases": test_cases_yaml,
-            }
-            with open(os.path.join(prob_dir, "init.yml"), "w") as f:
-                yaml.dump(init_yml, f)
+                    filenames.extend((in_name, out_name))
 
             pd, _ = ProblemData.objects.get_or_create(
                 problem=problem,
                 defaults={"checker": "standard"},
             )
-            pd.zipfile.name = f"{code}/{zip_name}"
-            pd.save()
+            pd.zipfile.save(zip_name, ContentFile(zip_bytes.getvalue()), save=True)
 
-            # Refresh ProblemTestCase database rows
-            ProblemTestCase.objects.filter(dataset=problem).delete()
             for idx in range(1, len(pdata["tests"]) + 1):
                 ProblemTestCase.objects.create(
                     dataset=problem,
@@ -509,10 +491,23 @@ class Command(BaseCommand):
                     is_pretest=False,
                 )
 
+            ProblemDataCompiler.generate(
+                problem, pd, problem.cases.order_by("order"), filenames
+            )
+            pd.refresh_from_db()
+            if pd.feedback or not pd.has_yml():
+                raise CommandError(
+                    f"Failed to prepare [{code}]: {pd.feedback or 'init.yml missing'}"
+                )
+
+            problem.is_public = True
+            problem.points = pdata["points"]
+            problem.save(update_fields=["is_public", "points"])
+            created_count += 1
             self.stdout.write(
                 self.style.SUCCESS(f"  ✓ [{code}] {name} ({len(pdata['tests'])} tests)")
             )
 
         self.stdout.write(
-            self.style.SUCCESS("\nSuccessfully seeded 10 real C++ problems!")
+            self.style.SUCCESS(f"Done: created {created_count} beginner problems.")
         )
