@@ -164,17 +164,17 @@ services:
         condition: service_healthy
 
   # ── Máy chấm Sandbox Execution (DMOJ Judge Server) ──────────────────────────
-  # LƯU Ý BẢO MẬT: Image judge-server được build từ LQDJudge/judge-server với cgroups v1/v2.
+  # LƯU Ý BẢO MẬT: Image judge-server của VNOJ chạy mã nộp bài trong sandbox.
   # Judge container được cách ly hoàn toàn trong mạng oj_judge_net, không kết nối DB/Redis.
   judge:
-    image: ${JUDGE_IMAGE:-vnoj/judge-tier1:latest}
+    image: ${JUDGE_IMAGE:-vnoj/judge-tiericpc:latest}
     restart: always
     env_file:
       - path: ${ENV_FILE:-.env.production}
         required: false
     environment:
       JUDGE_AUTH_KEY: ${JUDGE_AUTH_KEY:?Set JUDGE_AUTH_KEY in .env.production}
-    entrypoint: ["python3", "/home/judge/entrypoint.py"]
+    entrypoint: ["/usr/bin/tini", "--", "python3", "/home/judge/entrypoint.py"]
     cap_add:
       - SYS_PTRACE
     security_opt:

@@ -6,7 +6,7 @@ runtime:
   g++11: /usr/bin/g++
   g++14: /usr/bin/g++
   g++17: /usr/bin/g++
-  g++20: /usr/bin/g++-11
+  g++20: /usr/bin/g++
   gcc: /usr/bin/gcc
   gcc11: /usr/bin/gcc
   python3: /usr/bin/python3
