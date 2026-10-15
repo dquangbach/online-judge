@@ -525,6 +525,7 @@ AUTHENTICATION_BACKENDS = (
 
 SOCIAL_AUTH_PIPELINE = (
     "social_core.pipeline.social_auth.social_details",
+    "social_core.pipeline.social_auth.social_names",
     "social_core.pipeline.social_auth.social_uid",
     "social_core.pipeline.social_auth.auth_allowed",
     "judge.social_auth.verify_email",
@@ -739,7 +740,9 @@ CELERY_BEAT_SCHEDULE = {
 
 
 try:
-    with open(os.path.join(os.path.dirname(__file__), "local_settings.py")) as f:
+    with open(
+        os.path.join(os.path.dirname(__file__), "local_settings.py"), encoding="utf-8"
+    ) as f:
         exec(f.read(), globals())
 except IOError:
     pass

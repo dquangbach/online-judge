@@ -5,9 +5,6 @@ services:
   db:
     image: mariadb:10.11
     restart: always
-    env_file:
-      - path: ${ENV_FILE:-.env.production}
-        required: false
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env.production}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-dmoj}

@@ -12,7 +12,7 @@ from django.utils.translation import gettext as _
 from requests import HTTPError
 from reversion import revisions
 from social_core.backends.github import GithubOAuth2
-from social_core.exceptions import InvalidEmail, SocialAuthBaseException
+from social_core.exceptions import AuthResponseError, SocialAuthBaseException
 from social_core.pipeline.partial import partial
 from social_django.middleware import (
     SocialAuthExceptionMiddleware as OldSocialAuthExceptionMiddleware,
@@ -64,8 +64,8 @@ def slugify_username(username):
 
 
 def verify_email(backend, details, *args, **kwargs):
-    if not details["email"]:
-        raise InvalidEmail(backend)
+    if not details.get("email"):
+        raise AuthResponseError(backend, code="profile_email_missing")
 
 
 class UsernameForm(forms.Form):
