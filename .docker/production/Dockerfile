@@ -33,6 +33,10 @@ COPY . /code
 # Install production settings explicitly; fail the build if they are missing.
 COPY .docker/production/local_settings_production.py /code/dmoj/local_settings.py
 
+# Compile translation catalogs into the image so they survive container recreation.
+RUN find locale -type f -name '*.po' -exec sh -c \
+    'for po do msgfmt "$po" -o "${po%.po}.mo" || exit 1; done' sh {} +
+
 # Precompile frontend assets in the image
 RUN sass resources:sass_processed --no-source-map --style=expanded --quiet && \
     postcss \

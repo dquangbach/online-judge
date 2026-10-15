@@ -100,6 +100,10 @@ jobs:
             echo "==> Đang gom static files..."
             docker compose -f docker-compose.prod.yml --env-file .env.production run --rm web python3 manage.py collectstatic --noinput
 
+            # Tạo catalog JavaScript cho tất cả ngôn ngữ vào STATIC_ROOT dùng chung.
+            echo "==> Đang tạo bản dịch JavaScript..."
+            docker compose -f docker-compose.prod.yml --env-file .env.production run --rm web python3 manage.py compilejsi18n
+
             # 7. Khởi động lại dịch vụ theo cơ chế rolling update
             echo "==> Đang cập nhật và khởi chạy các container..."
             docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans
