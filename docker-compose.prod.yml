@@ -188,7 +188,7 @@ services:
       - ${PROBLEM_DIR:?Set PROBLEM_DIR in .env.production}:/problems:ro
       - ./.docker/judge/judge.yml:/home/judge/judge.yml:ro
       - ./.docker/judge/entrypoint.py:/home/judge/entrypoint.py:ro
-    command: ["run", "-c", "/tmp/judge.yml", "--no-watchdog", "-p", "9999", "bridge", "${JUDGE_NAME:-judge1}"]
+    command: ["run", "-c", "/run/judge.yml", "--no-watchdog", "-p", "9999", "bridge", "${JUDGE_NAME:-judge1}"]
     networks:
       - oj_judge_net
     depends_on:

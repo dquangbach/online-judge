@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 source = Path("/home/judge/judge.yml")
-target = Path("/tmp/judge.yml")
+target = Path("/run/judge.yml")
 key = os.environ["JUDGE_AUTH_KEY"]
 if key.startswith("change-me") or len(key) < 32:
     raise RuntimeError("JUDGE_AUTH_KEY must be replaced with a strong secret")
