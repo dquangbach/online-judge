@@ -8,6 +8,7 @@
 <div class="left-sidebar problem-left-sidebar">
   {{ make_tab_item('feed', 'far fa-lightbulb', problem_feed_url, _('Feed')) }}
   {{ make_tab_item('list', 'fa fa-list', problem_list_url, _('List')) }}
+  {{ make_tab_item('practice', 'fa fa-external-link-alt', url('practice_index'), _('100 English C++ problems')) }}
   {% if USE_ML_ENABLED() and request.user.is_authenticated %}
     {{ make_tab_item('semantic_search', 'fa fa-search', url('semantic_search'), _('Semantic Search')) }}
   {% endif %}

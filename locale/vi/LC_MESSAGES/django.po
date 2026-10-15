@@ -12513,6 +12513,10 @@ msgstr "Trang chủ hiện chưa có nội dung."
 msgid "Browse problems to start practicing."
 msgstr "Xem danh sách bài tập để bắt đầu luyện tập."
 
+#: dmoj/urls.py templates/home.html templates/problem/left-sidebar.html
+msgid "100 English C++ problems"
+msgstr "100 bài C++ tiếng Anh"
+
 #: templates/home/feed-comment.html:14
 #, python-format
 msgid "and %(count)s others"

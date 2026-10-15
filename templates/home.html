@@ -9,6 +9,7 @@
 {% block left_sidebar %}
   <div class="left-sidebar {% if request.user.is_authenticated %}home-sidebar-loggedin{% endif %}">
     {{ make_tab_item('problems', 'fa fa-puzzle-piece', url('problem_list'), _('Problems')) }}
+    {{ make_tab_item('practice', 'fa fa-external-link-alt', url('practice_index'), _('100 English C++ problems')) }}
     {{ make_tab_item('contests', 'fa fa-trophy', url('contest_list'), _('Contests')) }}
     {{ make_tab_item('courses', 'fa fa-book', url('course_list'), _('Courses')) }}
     {% if request.user.is_authenticated %}

@@ -247,6 +247,14 @@ def paged_list_view(view, name, **kwargs):
 urlpatterns = [
     re_path("", include("pagedown.urls")),
     re_path(
+        r"^practice/$",
+        TitledTemplateView.as_view(
+            template_name="practice/index.html",
+            title=_("100 English C++ problems"),
+        ),
+        name="practice_index",
+    ),
+    re_path(
         r"^$",
         blog.PostList.as_view(template_name="home.html", title=_("Home")),
         kwargs={"page": 1},
