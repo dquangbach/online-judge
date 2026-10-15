@@ -8,6 +8,9 @@
 
 {% block left_sidebar %}
   <div class="left-sidebar {% if request.user.is_authenticated %}home-sidebar-loggedin{% endif %}">
+    {{ make_tab_item('problems', 'fa fa-puzzle-piece', url('problem_list'), _('Problems')) }}
+    {{ make_tab_item('contests', 'fa fa-trophy', url('contest_list'), _('Contests')) }}
+    {{ make_tab_item('courses', 'fa fa-book', url('course_list'), _('Courses')) }}
     {% if request.user.is_authenticated %}
       {% if recent_organizations %}
         <div class="left-sidebar-header">{{ _('Recent groups') }}</div>
@@ -41,9 +44,6 @@
       </a>
     {% else %}
       {{ make_tab_item('about', 'fa fa-info-circle', url('about'), _('About')) }}
-      {{ make_tab_item('problems', 'fa fa-puzzle-piece', url('problem_list'), _('Problems')) }}
-      {{ make_tab_item('contests', 'fa fa-trophy', url('contest_list'), _('Contests')) }}
-      {{ make_tab_item('courses', 'fa fa-book', url('course_list'), _('Courses')) }}
       {{ make_tab_item('groups', 'fa fa-building-columns', url('organization_list'), _('Groups')) }}
     {% endif %}
   </div>
@@ -85,8 +85,17 @@
 {% block middle_content %}
   {% if feed_items %}
     {% include "home/feed-content.html" %}
-  {% else %}
+  {% elif posts %}
     {% include "blog/content.html" %}
+  {% else %}
+    <section class="blog-box home-empty-state">
+      <h2>{{ _('The homepage is empty for now.') }}</h2>
+      <p>{{ _('Browse problems to start practicing.') }}</p>
+      <p><a class="action-btn background-theme" href="{{ url('problem_list') }}">{{ _('Problems') }}</a></p>
+      {% if perms.judge.add_problem %}
+        <p><a href="{{ url('problem_add') }}">{{ _('Add Problem') }}</a></p>
+      {% endif %}
+    </section>
   {% endif %}
 {% endblock %}
 
